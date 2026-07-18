@@ -27,12 +27,13 @@ jobs:
         run: |
           mkdir -p $GITHUB_WORKSPACE/toolchains
           cd $GITHUB_WORKSPACE/toolchains
-          # 1. 获取 AOSP Clang (MediaTek / GKI 内核通常使用 14+ 版本的 Clang)
-          git clone --depth=1 https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r450784d.git clang
+          
+          # 1. 获取稳定开源的 Proton Clang (替代已失效的 GitLab 仓库)
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git clang
+          
           # 2. 获取 GCC 交叉编译链 (用于汇编代码与32位兼容处理)
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git gcc-aarch64
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git gcc-arm
-
       - name: Build vmlinux
         run: |
           export KBUILD_BUILD_USER="builder"
