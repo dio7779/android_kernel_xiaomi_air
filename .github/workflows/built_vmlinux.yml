@@ -1,1 +1,86 @@
+name: Build Xiaomi Air (MT6835) vmlinux
+on:
+ workflow_dispatch: # 允许在 GitHub 网页端手动触发
+jobs:
+ build:
+ runs-on: ubuntu-22.04
+ steps:
+ - name: Checkout Kernel Source
+ uses: actions/checkout@v4
+ with:
+ repository: SpeechlessMatt/android_kernel_xiaomi_air
+ depth: 1
+ - name: Setup Build Environment
+ run: |
+ sudo apt-get update
+ sudo apt-get install -y bc bison build-essential ccache curl flex \
+ g++-multilib gcc-multilib git gnupg gperf imagemagick lib32ncurses5-dev \
+ lib32readline-dev lib32z1-dev liblz4-tool libncurses5-dev libsdl1.2-dev \
+ libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool \
+ squashfs-tools xsltproc zip zlib1g-dev libc6-dev-i386 x11proto-core-dev \
+ libx11-dev libgl1-mesa-dev unzip fontconfig python3
+ - name: Download Toolchains (Clang & GCC)
+ run: |
+ mkdir -p $GITHUB_WORKSPACE/toolchains
+ cd $GITHUB_WORKSPACE/toolchains
+ # 1. 获取 AOSP Clang (MediaTek / GKI 内核通常使用 14+ 版本的 Clang)
+ git clone --depth=1 https://gitlab.com/crdroidandroid/
+android_prebuilts_clang_host_linux-x86_clang-r450784d.git clang
+ # 2. 获取 GCC 交叉编译链 (用于汇编代码与32位兼容处理)
+ git clone --depth=1 https://github.com/LineageOS/
+android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git gcc-aarch64
+ git clone --depth=1 https://github.com/LineageOS/
+android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9.git gcc-arm
+ - name: Build vmlinux
+ run: |
+ export KBUILD_BUILD_USER="builder"
+ export KBUILD_BUILD_HOST="github-actions"
+ # 注入编译器路径
+ export PATH=$GITHUB_WORKSPACE/toolchains/clang/bin:$GITHUB_WORKSPACE/
+toolchains/gcc-aarch64/bin:$GITHUB_WORKSPACE/toolchains/gcc-arm/bin:$PATH
+ # 设定跨平台编译环境变量
+ export ARCH=arm64
+ export SUBARCH=arm64
+ export CROSS_COMPILE=aarch64-linux-android-
+ export CROSS_COMPILE_ARM32=arm-linux-androideabi-
+export CC=clang
 
+ export LD=ld.lld
+
+ export AR=llvm-ar
+
+ export NM=llvm-nm
+
+ export OBJCOPY=llvm-objcopy
+
+ export OBJDUMP=llvm-objdump
+
+ export STRIP=llvm-strip
+
+ cd $GITHUB_WORKSPACE
+
+ mkdir -p out
+
+ # 生成 defconfig
+
+ # 提示: 如果报错找不到 air_defconfig，请前往 arch/arm64/configs/ 确认实际名称
+
+ make O=out air_defconfig
+
+ # 可选: 强制开启调试符号 (CONFIG_DEBUG_INFO) 以便于逆向
+
+ # scripts/config --file out/.config --enable CONFIG_DEBUG_INFO
+
+ # 编译目标设为 vmlinux，跳过生成 Image 和 dtbo，节省 CI 时间
+
+ make -j$(nproc --all) O=out vmlinux
+
+ - name: Upload vmlinux Artifact
+
+ uses: actions/upload-artifact@v4
+
+ with:
+
+ name: vmlinux-xiaomi-air
+
+ path: out/vmlinux
