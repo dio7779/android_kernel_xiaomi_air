@@ -29,6 +29,7 @@ jobs:
             libssl-dev \
             libncurses-dev \
             libelf-dev \
+            dwarves \
             rsync \
             git \
             python3 \
@@ -42,20 +43,18 @@ jobs:
 
       - name: Download AOSP Clang
         run: |
-          # 解决 wget exit code 8：改用 Git 稀疏检出（Sparse Checkout）精准拉取工具链
           mkdir -p $GITHUB_WORKSPACE/clang
           cd $GITHUB_WORKSPACE/clang
           git init
           git remote add origin https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86
           git sparse-checkout init --cone
           git sparse-checkout set clang-r450784d
-          # Android 源当前主分支可能为 main 或 master，尝试拉取
           git fetch --depth=1 origin main || git fetch --depth=1 origin master
           git checkout FETCH_HEAD
 
       - name: Build vmlinux
         run: |
-          # 环境变量设置：注意这里的 PATH 增加了一层 clang-r450784d 目录
+          # 环境变量设置
           export PATH=$GITHUB_WORKSPACE/clang/clang-r450784d/bin:$PATH
           export ARCH=arm64
           export SUBARCH=arm64
@@ -82,12 +81,17 @@ jobs:
             make O=out $DEFCONFIG_NAME 2>&1 | tee -a config.log
           fi
 
+          # 自动关闭 BTF 调试选项，双重保险规避 pahole 格式报错
+          if [ -f "out/.config" ]; then
+            sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/g' out/.config
+          fi
+
           echo "================ 开始编译 vmlinux ================" | tee build.log
           # 编译未压缩的内核文件 vmlinux
           make -j$(nproc --all) O=out vmlinux LLVM=1 LLVM_IAS=1 2>&1 | tee -a build.log
 
       - name: Upload Build Log
-        if: always() # 确保报错时也能保存日志
+        if: always() # 无论编译成功与否，均保存日志
         uses: actions/upload-artifact@v4
         with:
           name: kernel-build-logs
@@ -96,7 +100,7 @@ jobs:
             build.log
 
       - name: Upload vmlinux
-        if: success() # 只有编译成功才上传产物
+        if: success() # 仅在编译成功时上传生成的 vmlinux
         uses: actions/upload-artifact@v4
         with:
           name: vmlinux-redmi13c5g
