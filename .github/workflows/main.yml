@@ -1,8 +1,0 @@
-- name: 编译官方内核
-  run: |
-    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.1.tar.xz
-    tar -xf linux-6.1.tar.xz
-    cd linux-6.1
-    make x86_64_defconfig
-    make -j$(nproc)
-    # vmlinux 在根目录
