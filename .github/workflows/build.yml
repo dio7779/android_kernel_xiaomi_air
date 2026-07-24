@@ -81,17 +81,21 @@ jobs:
             make O=out $DEFCONFIG_NAME 2>&1 | tee -a config.log
           fi
 
-          # 自动关闭 BTF 调试选项，双重保险规避 pahole 格式报错
+          # 自动关闭 BTF 调试选项，规避 pahole 报错
           if [ -f "out/.config" ]; then
             sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/g' out/.config
           fi
 
+          # 核心修复：自动给所有 (NEW) 配置项填充默认值，阻止交互式询问引发 EOF 报错
+          echo "================ 补全缺失配置项 (olddefconfig) ================" | tee -a config.log
+          make O=out olddefconfig 2>&1 | tee -a config.log
+
           echo "================ 开始编译 vmlinux 与 System.map ================" | tee build.log
-          # 编译内核（会自动生成 out/vmlinux 以及 out/System.map）
+          # 编译内核
           make -j$(nproc --all) O=out vmlinux LLVM=1 LLVM_IAS=1 2>&1 | tee -a build.log
 
       - name: Upload Build Log
-        if: always() # 无论编译成功与否，均保存日志
+        if: always() # 无论成功与否均保存日志
         uses: actions/upload-artifact@v4
         with:
           name: kernel-build-logs
