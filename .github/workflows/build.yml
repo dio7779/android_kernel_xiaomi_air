@@ -1,4 +1,4 @@
-name: Build Redmi 13C 5G Kernel (vmlinux)
+name: Build Redmi 13C 5G Kernel (vmlinux & System.map)
 
 on:
   workflow_dispatch: # 支持手动点击按钮触发
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build vmlinux
+    name: Build Kernel
     runs-on: ubuntu-22.04
 
     steps:
@@ -52,7 +52,7 @@ jobs:
           git fetch --depth=1 origin main || git fetch --depth=1 origin master
           git checkout FETCH_HEAD
 
-      - name: Build vmlinux
+      - name: Build Kernel
         run: |
           # 环境变量设置
           export PATH=$GITHUB_WORKSPACE/clang/clang-r450784d/bin:$PATH
@@ -86,8 +86,8 @@ jobs:
             sed -i 's/CONFIG_DEBUG_INFO_BTF=y/# CONFIG_DEBUG_INFO_BTF is not set/g' out/.config
           fi
 
-          echo "================ 开始编译 vmlinux ================" | tee build.log
-          # 编译未压缩的内核文件 vmlinux
+          echo "================ 开始编译 vmlinux 与 System.map ================" | tee build.log
+          # 编译内核（会自动生成 out/vmlinux 以及 out/System.map）
           make -j$(nproc --all) O=out vmlinux LLVM=1 LLVM_IAS=1 2>&1 | tee -a build.log
 
       - name: Upload Build Log
@@ -99,9 +99,11 @@ jobs:
             config.log
             build.log
 
-      - name: Upload vmlinux
-        if: success() # 仅在编译成功时上传生成的 vmlinux
+      - name: Upload Kernel Artifacts (vmlinux & System.map)
+        if: success() # 仅在编译成功时上传
         uses: actions/upload-artifact@v4
         with:
-          name: vmlinux-redmi13c5g
-          path: out/vmlinux
+          name: kernel-artifacts-redmi13c5g
+          path: |
+            out/vmlinux
+            out/System.map
